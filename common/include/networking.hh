@@ -29,7 +29,9 @@ public:
         CHAT = 0x02
     };
 
-    Packet(PacketType type = AUTH, uint64_t token = 0, uint32_t playerId = 0, uint32_t value = 0, std::string txt = {}) {
+    Packet() = default;
+
+    Packet(PacketType type, uint64_t token = 0, uint32_t playerId = 0, uint32_t value = 0, std::string txt = {}) {
         packet.packetType = type;
         packet.reserved = 0;
         packet.Token = token;
@@ -37,10 +39,12 @@ public:
 
         if (type == CHAT) {
             text = txt;
+        } else if (type == DATA) {
+            this->value = value;
         }
     }
 
-    void SerializePacket(const NetworkPacket& packet, std::vector<uint8_t> &buffer) {
+    void SerializePacket(std::vector<uint8_t> &buffer) {
         buffer.resize(sizeof(NetworkPacket));
         std::memcpy(buffer.data(), &packet, sizeof(NetworkPacket));
 
@@ -55,10 +59,10 @@ public:
         }
     }
 
-    void DeserializePacket(const std::vector<uint8_t> &buffer) {
+    bool DeserializePacket(std::vector<uint8_t> &buffer) {
         if (buffer.size() < sizeof(NetworkPacket)) {
             std::cout << "Buffer size is too small to contain a valid NetworkPacket." << std::endl;
-            return;
+            return false;
         }
 
         std::memcpy(&packet, buffer.data(), sizeof(NetworkPacket));
@@ -68,7 +72,7 @@ public:
 
             if (buffer.size() < offset + 2) {
                 std::cout << "Buffer too small to text" << std::endl;
-                return;
+                return false;
             }
 
             uint16_t textLength = 0;
@@ -78,6 +82,7 @@ public:
 
             text.assign(reinterpret_cast<const char*>(buffer.data() + offset), textLength);
         }
+        return true;
     }
 
     const NetworkPacket& GetPacket() const { return packet; }
@@ -89,3 +94,14 @@ private:
     std::string text;
     uint32_t value;
 };
+
+
+#include <random>
+
+uint64_t GenerateNewToken() {
+    std::random_device rd;
+    std::mt19937_64 gen(rd());
+    std::uniform_int_distribution<uint64_t> dis(1, UINT64_MAX);
+    std::cout << "Generated a new Auth Token" << std::endl;
+    return dis(gen);
+}

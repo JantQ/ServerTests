@@ -1,6 +1,14 @@
 #include "networking.hh"
+#include <iostream>
+#include <sys/types.h>
 
 std::vector<int> clientSockets;
+
+struct Vector2 {
+    uint32_t playerId;
+    uint64_t authToken;
+};
+std::vector<Vector2> PlayerAuthList;
 
 int main() {
 	int serverSocket = socket(AF_INET, SOCK_STREAM, 0);
@@ -19,7 +27,7 @@ int main() {
     }
 
 	listen(serverSocket, 5);
-    
+    PlayerAuthList.push_back({100, 0});
 
     while (true) {
         fd_set readfds;
@@ -63,18 +71,64 @@ int main() {
                     it = clientSockets.erase(it);
                     continue;
                 }
+
                 Packet incomingPacket;
                 receiveBuffer.resize(bytesReceived);
 
-                incomingPacket.DeserializePacket(receiveBuffer);
+                bool real_packet = incomingPacket.DeserializePacket(receiveBuffer);
+
+                if (!real_packet) {
+                    close(socket);
+                    it = clientSockets.erase(it);
+                    continue;
+                }
 
                 NetworkPacket packet = incomingPacket.GetPacket();
+
+                bool playerFound = false;
+                bool isAuthenticated = false;
+                for (auto& player : PlayerAuthList) {
+                    if (player.playerId == packet.playerId) {
+                        playerFound = true;
+
+                        if (player.authToken != 0 && player.authToken == packet.Token) {
+
+                            isAuthenticated = true;
+                            std::cout << "Player Authenticated" << std::endl;
+                            Packet AuthPacket(Packet::AUTH, player.authToken, player.playerId);
+                            std::vector<uint8_t> buffer;
+                            AuthPacket.SerializePacket(buffer); 
+                            send(socket, buffer.data(), buffer.size(), 0);
+
+                        } else if (player.authToken == 0) {
+
+                            player.authToken = GenerateNewToken();
+                            Packet AuthPacket(Packet::AUTH, player.authToken, packet.playerId);
+                            std::vector<uint8_t> buffer;
+                            AuthPacket.SerializePacket(buffer); 
+                            send(socket, buffer.data(), buffer.size(), 0);
+
+                        } else if (player.authToken != packet.Token) {
+
+                            isAuthenticated = false;
+                            std::cout << "Player is not authenticated" << std::endl;
+                            Packet AuthPacket(Packet::AUTH, packet.Token, packet.playerId);
+                            std::vector<uint8_t> buffer;
+                            AuthPacket.SerializePacket(buffer); 
+                            send(socket, buffer.data(), buffer.size(), 0);
+                        }
+                        break;
+                    }
+                }
+
+                if (!playerFound) {
+                    std::cout << "Player not found from authlist" << std::endl;
+                }
 
                 std::cout << "Packet Type: " << +packet.packetType << std::endl;
                 if (packet.packetType == Packet::CHAT) {
                     std::cout << "Received: " << incomingPacket.GetText() << std::endl;
                 }
-
 
                 ++it;
             } else {

@@ -1,9 +1,10 @@
 #include "networking.hh"
+#include <cstring>
 #include <iostream>
+#include <string>
 
-Packet AuthPacket(Packet::AUTH, 987654321ULL, 101);
-Packet DataPacket(Packet::DATA, 987654321ULL, 102);
-Packet ChatPacket(Packet::CHAT, 987654321ULL, 103, 0, "Hello Server");
+uint64_t authToken = 0x0000000000000000;
+uint32_t playerId = 100;
 
 int main() {
     int clientSocket = socket(AF_INET, SOCK_STREAM, 0);
@@ -19,22 +20,47 @@ int main() {
         return 1;
     }
 
+    Packet FirstAuth(Packet::AUTH, authToken, playerId);
+    std::vector<uint8_t> authData (1024);
+    FirstAuth.SerializePacket(authData);
+    send(clientSocket, authData.data(), authData.size(), 0);
+    explicit_bzero(authData.data(), authData.size());
+
+    ssize_t bytesReceived = recv(clientSocket, authData.data(), authData.size(), 0);
+    authData.resize(sizeof(NetworkPacket));
+    FirstAuth.DeserializePacket(authData);
+
+    NetworkPacket authPacket = FirstAuth.GetPacket();
+    authToken = authPacket.Token;
+    playerId = authPacket.playerId;
+
     while (true) {
         std::vector<uint8_t> buffer;
+        std::vector<uint8_t> receiveBuffer(1024);
 
-        std::string sendPacketType;
-        std::cout << "What type of packet to send?" << std::endl;
-        std::cin >> sendPacketType;
-        if (sendPacketType == "AUTH") {
-            AuthPacket.SerializePacket(AuthPacket.GetPacket(), buffer);
-        } else if (sendPacketType == "DATA") {
-            DataPacket.SerializePacket(DataPacket.GetPacket(), buffer);
-        } else if (sendPacketType == "CHAT") {
-            ChatPacket.SerializePacket(ChatPacket.GetPacket(), buffer);
+        std::string answer;
+        std::cout << "Send packet with correct data? y/n" << std::endl;
+        std::getline(std::cin, answer);
+
+        if (answer == "y") {
+            Packet RealPacket(Packet::AUTH, authToken, playerId);
+            RealPacket.SerializePacket(buffer);
+        } else if (answer == "n") {
+            Packet FakePacket(Packet::AUTH, 0x0123456789abcdef, playerId);
+            FakePacket.SerializePacket(buffer);
+        } else {
+            send(clientSocket, "Bye!", 5, 0);
+            break;
         }
 
         ssize_t bytesSent = send(clientSocket, buffer.data(), buffer.size(), 0);
         std::cout << "Sent: " << bytesSent << " bytes" << std::endl;
+
+        ssize_t receivedBytes = recv(clientSocket, receiveBuffer.data(), receiveBuffer.size(), 0);
+        receiveBuffer.resize(receivedBytes);
+        Packet IncomingPacket;
+        IncomingPacket.DeserializePacket(receiveBuffer);
+        NetworkPacket packet = IncomingPacket.GetPacket();
     }
 
     close(clientSocket);
