@@ -1,52 +1,43 @@
-#include <cstring>
+#include "networking.hh"
 #include <iostream>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <unistd.h>
-#include "common/networking.hh"
-#include <string>
+
+Packet AuthPacket(Packet::AUTH, 987654321ULL, 101);
+Packet DataPacket(Packet::DATA, 987654321ULL, 102);
+Packet ChatPacket(Packet::CHAT, 987654321ULL, 103, 0, "Hello Server");
 
 int main() {
-	int clientSocket = socket(AF_INET, SOCK_STREAM, 0);
-	GamePacket packet;
-	packet.packetType = 1;
-	packet.playerId = 1234;
+    int clientSocket = socket(AF_INET, SOCK_STREAM, 0);
 
-	sockaddr_in serverAddress;
-	serverAddress.sin_family = AF_INET;
-	serverAddress.sin_port = htons(55554);
-	serverAddress.sin_addr.s_addr = INADDR_ANY;
-	
-	connect(clientSocket, (struct sockaddr*)&serverAddress, sizeof(serverAddress));
-	
-	while (true) {
-		std::string answer;
-		std::cout << "Send Packet? y/n\n";
-		std::getline(std::cin, answer);
+    sockaddr_in serverAddress;
+    serverAddress.sin_family = AF_INET;
+    serverAddress.sin_port = htons(55554);
+    serverAddress.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
 
-		if (answer == "y") {
-			sendPacket(clientSocket, packet);
-			receivePacket(clientSocket);
-		}
-		else if (answer == "exit") {
-			packet.packetType = PACKET_DISCONNECT;
-			packet.playerId = 0;
-			sendPacket(clientSocket, packet);
-			receivePacket(clientSocket);
-			break;
-		}
-	}
-	close(clientSocket);
+    if (connect(clientSocket, (struct sockaddr*)&serverAddress, sizeof(serverAddress)) == -1) {
+        perror("connect");
+        close(clientSocket);
+        return 1;
+    }
 
-	return 0;
-}
+    while (true) {
+        std::vector<uint8_t> buffer;
 
-void sendPacket(int clientSocket, GamePacket packet) {
-	send(clientSocket, &packet, sizeof(packet), 0);
-}
+        std::string sendPacketType;
+        std::cout << "What type of packet to send?" << std::endl;
+        std::cin >> sendPacketType;
+        if (sendPacketType == "AUTH") {
+            AuthPacket.SerializePacket(AuthPacket.GetPacket(), buffer);
+        } else if (sendPacketType == "DATA") {
+            DataPacket.SerializePacket(DataPacket.GetPacket(), buffer);
+        } else if (sendPacketType == "CHAT") {
+            ChatPacket.SerializePacket(ChatPacket.GetPacket(), buffer);
+        }
 
-void receivePacket(int clientSocket) {
-	char buffer[1024] = {0};
-	recv(clientSocket, buffer, sizeof(buffer) - 1, 0);
-	std::cout << "Message from the server: " << buffer << '\n';
+        ssize_t bytesSent = send(clientSocket, buffer.data(), buffer.size(), 0);
+        std::cout << "Sent: " << bytesSent << " bytes" << std::endl;
+    }
+
+    close(clientSocket);
+
+    return 0;
 }

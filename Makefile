@@ -12,10 +12,10 @@ SERVER_BIN := $(SERVER_DIR)/server
 all: $(CLIENT_BIN) $(SERVER_BIN)
 
 $(CLIENT_BIN): $(CLIENT_DIR)/src/main.cc
-	$(CXX) $(CXXFLAGS) -I$(CLIENT_DIR)/include -I$(COMMON_DIR)/include -o $@ $(CLIENT_DIR)/src/main.cc
+	$(CXX) $(CXXFLAGS) -I$(CLIENT_DIR)/include/ -I$(COMMON_DIR)/include -o $@ $(CLIENT_DIR)/src/main.cc
 
 $(SERVER_BIN): $(SERVER_DIR)/src/main.cc
-	$(CXX) $(CXXFLAGS) -I$(SERVER_DIR)/include -I$(COMMON_DIR)/include -o $@ $(SERVER_DIR)/src/main.cc
+	$(CXX) $(CXXFLAGS) -I$(SERVER_DIR)/include/ -I$(COMMON_DIR)/include -o $@ $(SERVER_DIR)/src/main.cc
 
 clean:
 	rm -f $(CLIENT_BIN) $(SERVER_BIN)

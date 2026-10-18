@@ -1,14 +1,12 @@
-#include <iostream>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <unistd.h>
-#include <cstring>
-#include <string>
-#include "server/networking.hh"
-#include "common/networking.hh"
+#include "networking.hh"
+
+#include <errno.h>
+
+std::vector<uint8_t> receiveBuffer(1024);
+std::vector<int> clientSockets;
+
 
 int main() {
-	GamePacket packet;
 	int serverSocket = socket(AF_INET, SOCK_STREAM, 0);
 
 	sockaddr_in serverAddress;
@@ -17,34 +15,64 @@ int main() {
 	serverAddress.sin_addr.s_addr = INADDR_ANY;
 
 	bind(serverSocket, (struct sockaddr*)&serverAddress, sizeof(serverAddress));
-	
+    
+    if (fcntl(serverSocket, F_SETFL, O_NONBLOCK) == -1) {
+        perror("fcntl (set O_NONBLOCK) on server socket");
+        close(serverSocket);
+        return 1;
+    }
+
 	listen(serverSocket, 5);
-	int clientSocket = accept(serverSocket, nullptr, nullptr);
+    
 
     while (true) {
-        ssize_t bytesRead = recv(clientSocket, &packet, sizeof(packet), 0);
+        fd_set readfds;
+        FD_ZERO(&readfds);
 
-        if (bytesRead <= 0) {
-            std::cout << "Error receiving packet from client.\n";
-            close(clientSocket);
-            while ((clientSocket = accept(serverSocket, nullptr, nullptr)) < 0) {
+        FD_SET(serverSocket, &readfds);
+        int maxfd = serverSocket;
 
+        for (int socket : clientSockets) {
+            FD_SET(socket, &readfds);
+            if (socket > maxfd) {
+                maxfd = socket;
             }
         }
 
-        if (packet.packetType == PACKET_DISCONNECT) {
-            std::cout << "Client " << packet.playerId << " requested disconnect.\n";
-            send(clientSocket, "Disconnecting from server.\n", 27, 0);
-            close(clientSocket);
-            
-            while ((clientSocket = accept(serverSocket, nullptr, nullptr)) < 0) {
+        int ready = select(maxfd + 1, &readfds, nullptr, nullptr, nullptr);
+        if (ready < 0) continue;
 
+        if (FD_ISSET(serverSocket, &readfds)) {
+            int newClientSocket = accept(serverSocket, nullptr, nullptr);
+
+
+            std::cout << "New client connected: " << newClientSocket << std::endl;
+            if (fcntl(newClientSocket, F_SETFL, O_NONBLOCK) == -1) {
+                perror("fcntl (set O_NONBLOCK) on client socket");
+                close(newClientSocket);
+                continue;
             }
+            clientSockets.push_back(newClientSocket);
         }
 
-        std::cout << "Received message from client " << packet.playerId << " with type " << (int)packet.packetType << ".\n";
-        std::string response = "Hello from the server! I received your message.\n";
-        send(clientSocket, response.c_str(), response.length(), 0);
+        for (auto it = clientSockets.begin(); it != clientSockets.end();) {
+            int socket = *it;
+            if (FD_ISSET(socket, &readfds)) {
+                ssize_t bytesReceived = recv(socket, receiveBuffer.data(), receiveBuffer.size(), 0);
+
+                if (bytesReceived == 0) {
+                    std::cout << "Client disconnected: " << socket << std::endl;
+                    close(socket);
+                    it = clientSockets.erase(it);
+                    continue;
+                }
+
+                std::cout << "Received " << bytesReceived << " bytes from client " << socket << std::endl;
+                ++it;
+            } else {
+                ++it; 
+            }
+        }
     }
 	close(serverSocket);
 	return 0;

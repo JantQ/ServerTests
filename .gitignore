@@ -1,4 +1,17 @@
+# Build artefacts
 .o
-server
-client
+*.o
+*.a
+*.so
+*.dylib
+*.dll
+*.exe
+*.out
+
+# Binaries produced by the Makefile
+/client/client
+/server/server
+
+# Miscellaneous
 Modelfile
+.clangd
