@@ -1,10 +1,6 @@
 #include "networking.hh"
 
-#include <errno.h>
-
-std::vector<uint8_t> receiveBuffer(1024);
 std::vector<int> clientSockets;
-
 
 int main() {
 	int serverSocket = socket(AF_INET, SOCK_STREAM, 0);
@@ -58,16 +54,28 @@ int main() {
         for (auto it = clientSockets.begin(); it != clientSockets.end();) {
             int socket = *it;
             if (FD_ISSET(socket, &readfds)) {
+                std::vector<uint8_t> receiveBuffer(1024);
                 ssize_t bytesReceived = recv(socket, receiveBuffer.data(), receiveBuffer.size(), 0);
-
-                if (bytesReceived == 0) {
-                    std::cout << "Client disconnected: " << socket << std::endl;
+                
+                if (bytesReceived <= 0) {
+                    std::cout << "Client Disconnected" << std::endl;
                     close(socket);
                     it = clientSockets.erase(it);
                     continue;
                 }
+                Packet incomingPacket;
+                receiveBuffer.resize(bytesReceived);
 
-                std::cout << "Received " << bytesReceived << " bytes from client " << socket << std::endl;
+                incomingPacket.DeserializePacket(receiveBuffer);
+
+                NetworkPacket packet = incomingPacket.GetPacket();
+
+                std::cout << "Packet Type: " << +packet.packetType << std::endl;
+                if (packet.packetType == Packet::CHAT) {
+                    std::cout << "Received: " << incomingPacket.GetText() << std::endl;
+                }
+
+
                 ++it;
             } else {
                 ++it; 

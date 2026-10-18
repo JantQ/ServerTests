@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <fcntl.h>
@@ -38,8 +39,6 @@ public:
             text = txt;
         }
     }
-
-    Packet() = default;
 
     void SerializePacket(const NetworkPacket& packet, std::vector<uint8_t> &buffer) {
         buffer.resize(sizeof(NetworkPacket));
