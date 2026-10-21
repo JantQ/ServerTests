@@ -8,9 +8,11 @@
 *.exe
 *.out
 
+*.bon
+
 # Binaries produced by the Makefile
-/client/client
-/server/server
+client/client
+server/server
 
 # Miscellaneous
 Modelfile

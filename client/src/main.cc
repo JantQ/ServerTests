@@ -1,13 +1,23 @@
 #include "networking.hh"
+#include "data.hh"
+#include <cstdint>
 #include <cstring>
 #include <iostream>
-#include <string>
+#include <memory>
+#include <ostream>
 
 uint64_t authToken = 0x0000000000000000;
 uint32_t playerId = 100;
 
+std::vector<Data> saveDataFile;
+std::vector<uint8_t> dataBuffer;
+
+Data dataBug;
+
 int main() {
     int clientSocket = socket(AF_INET, SOCK_STREAM, 0);
+
+    saveDataFile.push_back( {300, 2050, 100});
 
     sockaddr_in serverAddress;
     serverAddress.sin_family = AF_INET;
@@ -48,6 +58,16 @@ int main() {
         } else if (answer == "n") {
             Packet FakePacket(Packet::AUTH, 0x0123456789abcdef, playerId);
             FakePacket.SerializePacket(buffer);
+        } else if (answer == "save") {
+            data::saveData("../../../Server/ServerTests/file?.bon", saveDataFile);
+            continue;
+        } else if (answer == "read") {
+            data::readData("../../../Server/ServerTests/file?.bon", dataBuffer);
+
+            std::memcpy(&dataBug, dataBuffer.data(), sizeof(Data));
+
+            std::cout << "read this: " << dataBug.id << " " << dataBug.something << " " << dataBug.value << std::endl;
+            continue;
         } else {
             send(clientSocket, "Bye!", 5, 0);
             break;

@@ -11,6 +11,9 @@
 #include <vector>
 #include <string>
 #include <iostream>
+#include <sys/types.h>
+
+
 
 #pragma pack(push, 1)
 struct NetworkPacket {
@@ -26,7 +29,8 @@ public:
     enum PacketType : uint8_t {
         AUTH = 0x00,
         DATA = 0x01,
-        CHAT = 0x02
+        CHAT = 0x02,
+        COMMAND = 0x03,
     };
 
     Packet() = default;

@@ -1,4 +1,0 @@
--std=c++23
--Iclient/include
--Iserver/include
--Icommon/include

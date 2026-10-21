@@ -1,6 +1,4 @@
 #include "networking.hh"
-#include <iostream>
-#include <sys/types.h>
 
 std::vector<int> clientSockets;
 
